@@ -5,14 +5,10 @@ using UnityEngine.EventSystems;
 
 public class BlockMgr : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerDownHandler, IPointerUpHandler
 {
-    public int[,] shapedata = new int[3, 3]{
-        {0, 0, 0 },
-        {0, 1, 1},
-        {1, 0, 0}
-    };
     public GameObject childBlock;
     public float longPressTime = 0.3f;
-
+    static int index = 0;
+    static int putCnt = 0;
     List<GameObject> childBlocks;
     Vector2 startPos;
     Vector2 startMousePos;
@@ -21,41 +17,96 @@ public class BlockMgr : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
     bool flipY = true;
     RectTransform trans;
     bool bePut = false;
-    public void OnBeginDrag(PointerEventData eventData)
-    {
-        CheckBefore();
+    bool firstUsed = true;
 
-        clickEnabled = false;
-        startPos = trans.position;
-        startMousePos = eventData.position;
+
+    public AudioSource music;
+    public AudioClip rotateSound;
+    public AudioClip pickSound;
+
+    private void GenerateNextBlock()
+    {
+        firstUsed = false;
+        BlockCtrl.instance.GenerateBlock();
     }
 
-    
     private void CheckBefore()
     {
         if (bePut)
         {
             bePut = false;
+            putCnt--;
             foreach (GameObject block in childBlocks)
                 BoardMgr.instance.UpdateStates(block.transform.position, 0);
+            BoardMgr.instance.UpdateDisabled();
         }
+    }
+
+    private void Check()
+    {
+        BoardMgr.instance.ClearStateGreen();
+        if (RayCast())
+        {
+            foreach (GameObject block in childBlocks)
+                BoardMgr.instance.UpdateStates(block.transform.position, 2);
+        }
+    }
+
+
+
+    void CheckAfter()
+    {
+        if (RayCast())
+        {
+            trans.position = trans.position + BoardMgr.instance.CalculateAlignOffset(childBlocks[0].transform.position);
+            bePut = true;
+            putCnt++;
+            if(putCnt == ConstData.piece_init.Length)
+            {
+                Debug.Log("Win!");
+            }
+            foreach (GameObject block in childBlocks)
+                BoardMgr.instance.UpdateStates(block.transform.position, 1);
+            BoardMgr.instance.UpdateDisabled();
+
+            music.clip = pickSound;
+            music.Play();
+        }
+    }
+
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (firstUsed)
+        {
+            GenerateNextBlock();
+        }
+
+        CheckBefore();
+
+        clickEnabled = false;
+        startPos = trans.position;
+        startMousePos = eventData.position;
+        Debug.Log("Drag begin");
     }
 
     public void OnDrag(PointerEventData eventData)
     {
         trans.position = startPos + (eventData.position - startMousePos);
-        
+        Check();
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
         clickEnabled = true;
         CheckAfter();
+        
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
         if (!clickEnabled) return;
+        Debug.Log("Pointer down");
         CheckBefore();
         startClickTime = Time.time;
         startMousePos = eventData.position;
@@ -81,12 +132,15 @@ public class BlockMgr : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
             trans.RotateAround(startMousePos, Vector3.forward, 90);
 
         }
+        music.clip = rotateSound;
+        music.Play();
         CheckAfter();
     }
 
     // Start is called before the first frame update
     void Start()
     {
+        int[,] shapedata = ConstData.piece_init[index++];
         trans = GetComponent<RectTransform>();
         childBlocks = new List<GameObject>();
         Vector3 factor = Vector3.Scale(new Vector3(1 / 18f, 1 / 18f, 0), new Vector3(Screen.height, Screen.height, 0));
@@ -102,18 +156,12 @@ public class BlockMgr : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDrag
                 }
             }
         }
+        music = gameObject.AddComponent<AudioSource>();
+        music.playOnAwake = false;
+        rotateSound = Resources.Load("sound/xiu") as AudioClip;
+        pickSound = Resources.Load("sound/ze") as AudioClip;
     }
 
-    void CheckAfter()
-    {
-        if (RayCast())
-        {
-            trans.position = trans.position + BoardMgr.instance.CalculateAlignOffset(childBlocks[0].transform.position);
-            bePut = true;
-            foreach (GameObject block in childBlocks)
-                BoardMgr.instance.UpdateStates(block.transform.position, 1);
-        }
-    }
 
     bool RayCast()
     {

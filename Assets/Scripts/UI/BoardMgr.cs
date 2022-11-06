@@ -12,7 +12,8 @@ public class BoardMgr : MonoBehaviour
     // Start is called before the first frame update
 
     public static BoardMgr instance;
-    
+
+
     private void Awake()
     {
         if (instance != null)
@@ -44,8 +45,7 @@ public class BoardMgr : MonoBehaviour
         int[] index;
         if(PosToIndex(pos, out index))
         {
-            Debug.Log((index[0], index[1]));
-            return states[index[0], index[1]] == 0;
+            return states[index[0], index[1]] == 0 || states[index[0], index[1]] == 2;
         }
         return false;
     }
@@ -58,19 +58,74 @@ public class BoardMgr : MonoBehaviour
         
     }
 
+    public void ClearStateGreen()
+    {
+        for (int i = 0; i < size[0]; i++)
+        {
+            for (int j = 0; j < size[1]; j++)
+            {
+                if(states[i, j] == 2){
+                    UpdateStates(i, j, 0);
+                }
+            }
+        }
+    }
+
+    public void UpdateDisabled()
+    {
+        int[] ox = new int[8] { -1, -1, -1, 0, 0, 1, 1, 1 };
+        int[] oy = new int[8] { -1, 0, 1, -1, 1, -1, 0, 1 };
+        for (int i = 0; i < size[0]; i++)
+        {
+            for (int j = 0; j < size[1]; j++)
+            {
+                if(states[i, j] == 3)
+                {
+                    UpdateStates(i, j, 0);
+                }
+                if (states[i, j] != 1)
+                {
+                    for(int k = 0; k < 8; k++)
+                    {
+                        int x = i + ox[k];
+                        int y = j + oy[k];
+                        if (x >= 0 && x < size[0] && y >= 0 && y < size[1] && states[x, y] == 1)
+                        {
+                            UpdateStates(i, j, 3);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void UpdateStates(int x, int y, int state)
+    {
+        states[x, y] = state;
+        if (state == 0)
+        {
+            grids[x, y].GetComponent<Image>().color = Color.white;
+        }
+        else if (state == 1)
+        {
+            grids[x, y].GetComponent<Image>().color = Color.red;
+        }
+        else if (state == 2)
+        {
+            grids[x, y].GetComponent<Image>().color = Color.green * 0.5f;
+        }
+        else if (state == 3)
+        {
+            grids[x, y].GetComponent<Image>().color = Color.grey;
+        }
+    }
+
     public void UpdateStates(Vector2 pos, int state)
     {
         int[] index;
         PosToIndex(pos, out index);
-        states[index[0], index[1]] = state;
-        if(state == 0)
-        {
-            grids[index[0], index[1]].GetComponent<Image>().color = Color.white;
-        }
-        else if(state == 1)
-        {
-            grids[index[0], index[1]].GetComponent<Image>().color = Color.red;
-        }
+        UpdateStates(index[0], index[1], state);
     }
 
     bool PosToIndex(Vector2 pos, out int[] index)
